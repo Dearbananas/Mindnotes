@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "root": {
+    "id": "ntb961un",
+    "content": "📚 我的学习笔记",
+    "collapsed": false,
+    "children": [
+      {
+        "id": "njgbc1e5",
+        "content": "🧮 数学",
+        "collapsed": false,
+        "children": [
+          {
+            "id": "nl26478d",
+            "content": "代数<div>方程与函数</div>",
+            "collapsed": false,
+            "children": [],
+            "w": 120,
+            "h": 64,
+            "x": 368,
+            "y": 0
+          },
+          {
+            "id": "nhelx0da",
+            "content": "几何<table class=\"ntab\"><tr><td>图形</td><td>公式</td></tr><tr><td>圆</td><td>πr²</td></tr></table>",
+            "collapsed": false,
+            "children": [],
+            "w": 146,
+            "h": 112,
+            "x": 368,
+            "y": 86
+          }
+        ],
+        "w": 120,
+        "h": 43,
+        "x": 184,
+        "y": 77.5
+      },
+      {
+        "id": "nsnef21q",
+        "content": "💡 灵感收集",
+        "collapsed": false,
+        "children": [],
+        "w": 120,
+        "h": 43,
+        "x": 184,
+        "y": 220
+      }
+    ],
+    "w": 120,
+    "h": 64,
+    "x": 0,
+    "y": 99.5
+  }
+}
