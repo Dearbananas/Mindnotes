@@ -10,6 +10,7 @@ const APP = {
   owner: '', repo: '', branch: 'main', token: '',
   notesFolder: 'notes', assets: 'assets'
 };
+let currentUser = null;   // 当前登录账号，未登录时为 null
 let root = null;
 let selectedId = null;
 let scale = 1, tx = 60, ty = 60;
@@ -647,13 +648,20 @@ function fileToB64(file) {
  * 云端：notes/index.json 记清单 + 每篇 notes/<id>.json 存树
  * ========================================================================= */
 const LS_WORKSPACE = 'mindnotes_workspace';
+const LS_USERS = 'mindnotes_users';            // { username: { salt, hash, createdAt } }
+const LS_SESSION = 'mindnotes_session';        // { username, loginAt }
+const LS_CONFIG = 'mindnotes_config';
+/* 工作区命名空间：每账号独立 localStorage 槽位 */
+function workspaceKey(user) { return LS_WORKSPACE + ':' + user; }
+function userNotesFolder(user) { return (APP.notesFolder || 'notes') + '/' + user; }
+function userAssetsFolder(user) { return (APP.assets || 'assets') + '/' + user; }
 let notes = {};            // id -> { title, root }
 let noteOrder = [];        // 显示顺序（新笔记置顶）
 let currentNoteId = null;  // 当前笔记 id
 
 function configured() { return !!(APP.token && APP.owner && APP.repo); }
-function notesIndexPath() { return `${APP.notesFolder}/index.json`; }
-function noteFilePath(id) { return `${APP.notesFolder}/${id}.json`; }
+function notesIndexPath() { return `${userNotesFolder(currentUser)}/index.json`; }
+function noteFilePath(id) { return `${userNotesFolder(currentUser)}/${id}.json`; }
 
 /* 序列化时剔掉以 _ 开头的字段（_el 是 DOM 引用，x/y/w/h/_hidden 是布局缓存），
    否则快照里会塞进一堆无用数据，体积能翻好几倍 */
@@ -662,11 +670,12 @@ function serializeTree() { return JSON.stringify({ version: 1, root }, SNAP_REPL
 
 /* ---- 本地持久化：整个工作区一起存（多笔记共存）---- */
 function persistLocal() {
+  if (!currentUser) return;
   const obj = {
     version: 1, order: noteOrder, current: currentNoteId,
     notes: Object.fromEntries(noteOrder.map(id => [id, { title: notes[id].title, root: notes[id].root }]))
   };
-  try { localStorage.setItem(LS_WORKSPACE, JSON.stringify(obj, SNAP_REPLACER)); } catch (e) {}
+  try { localStorage.setItem(workspaceKey(currentUser), JSON.stringify(obj, SNAP_REPLACER)); } catch (e) {}
 }
 function autosaveRaw() { persistLocal(); }
 /* autosave = 落盘 + 记一笔历史。所有改动点都调它，历史自动覆盖 */
@@ -683,8 +692,9 @@ function migrateOldLocal() {
   return null;
 }
 function loadLocalWorkspace() {
+  if (!currentUser) return false;
   try {
-    const raw = localStorage.getItem(LS_WORKSPACE);
+    const raw = localStorage.getItem(workspaceKey(currentUser));
     if (!raw) return false;
     const o = JSON.parse(raw);
     if (!o || !o.order || !o.order.length) return false;
@@ -820,17 +830,23 @@ function renderNoteList() {
     const title = document.createElement('span');
     title.className = 'note-title';
     title.textContent = n.title;
-    title.title = '点击打开';
-    title.addEventListener('click', () => switchNote(id));
+    title.title = '单击改名 · 双击或回车打开';
+    /* 单击直接进入行内编辑（解决「新增后无法改名」的痛点） */
+    title.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (title.isContentEditable) return;   // 已在编辑态
+      startInlineRename(title, id);
+    });
+    /* 双击/回车直接打开（不进入编辑态） */
+    title.addEventListener('dblclick', (e) => { e.stopPropagation(); switchNote(id); });
 
     const actions = document.createElement('span');
     actions.className = 'note-actions';
     const bRename = document.createElement('button');
-    bRename.textContent = '✎'; bRename.title = '重命名';
+    bRename.textContent = '✎'; bRename.title = '改名';
     bRename.addEventListener('click', (e) => {
       e.stopPropagation();
-      const t = prompt('笔记名称', n.title);
-      if (t !== null) renameNote(id, t);
+      startInlineRename(document.querySelector('.note-item.active .note-title') || title, id);
     });
     const bDel = document.createElement('button');
     bDel.textContent = '🗑'; bDel.title = '删除'; bDel.className = 'del';
@@ -841,6 +857,71 @@ function renderNoteList() {
     ul.appendChild(li);
   }
 }
+
+/* 行内改名：把 span 切到 contenteditable，Enter 保存 / Esc 取消 / 失焦保存
+   用事件委托（keydown 在 #noteList 上）—— 避免 renameNote→renderNoteList 重建 span 丢失监听 */
+let _renamingSpan = null;
+let _renamingId = null;
+let _renameSnapshot = null;
+function startInlineRename(span, id) {
+  if (!span || !notes[id]) return;
+  if (span.isContentEditable) return;
+  _renamingSpan = span;
+  _renamingId = id;
+  _renameSnapshot = span.textContent;
+  span.contentEditable = 'true';
+  span.classList.add('editing');
+  /* 选中全部文字便于覆盖输入 */
+  const r = document.createRange();
+  r.selectNodeContents(span);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  span.focus();
+}
+function endInlineRename(commit) {
+  const span = _renamingSpan; const id = _renamingId;
+  if (!span) return;
+  _renamingSpan = null; _renamingId = null;
+  span.contentEditable = 'false';
+  span.classList.remove('editing');
+  if (commit) {
+    const t = (span.textContent || '').trim();
+    if (t && t !== notes[id].title) {
+      notes[id].title = t;
+      persistLocal();
+      if (configured()) putManifest().catch(() => {});
+    } else if (!t) {
+      /* 空名 → 强制回退为「未命名笔记」并同步标题 */
+      notes[id].title = '未命名笔记';
+      persistLocal();
+      if (configured()) putManifest().catch(() => {});
+      span.textContent = notes[id].title;
+    } else {
+      span.textContent = notes[id].title;   // 还原（与原值相同）
+    }
+  } else {
+    span.textContent = notes[id].title;   // Esc 还原
+  }
+  _renameSnapshot = null;
+}
+/* 事件委托：keydown 装在 #noteList 上，跨 renderNoteList 重建也存活 */
+(function wireRenameDelegation() {
+  const list = document.getElementById('noteList');
+  if (!list) return;
+  list.addEventListener('keydown', (e) => {
+    if (!_renamingSpan) return;
+    if (e.target !== _renamingSpan) return;
+    if (e.key === 'Enter') { e.preventDefault(); endInlineRename(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); endInlineRename(false); }
+  });
+  list.addEventListener('focusout', (e) => {
+    if (!_renamingSpan) return;
+    if (e.target !== _renamingSpan) return;
+    /* 焦点真离开了 span（不是切到自己的子元素） */
+    setTimeout(() => {
+      if (_renamingSpan && !_renamingSpan.contains(document.activeElement)) endInlineRename(true);
+    }, 0);
+  });
+})();
 
 /* =========================================================================
  * 撤销 / 重做（快照式）
@@ -1287,12 +1368,12 @@ document.getElementById('setSave').addEventListener('click', () => {
   APP.token = document.getElementById('setToken').value.trim();
   APP.notesFolder = document.getElementById('setNotesFolder').value.trim() || 'notes';
   APP.assets = document.getElementById('setAssets').value.trim() || 'assets';
-  localStorage.setItem('mindnotes_config', JSON.stringify(APP));
+  localStorage.setItem(LS_CONFIG, JSON.stringify(APP));
   document.getElementById('settingsModal').classList.add('hidden');
   toast('设置已保存（本机）· 当前平台：' + providerLabel());
 });
 function loadConfig() {
-  try { const c = JSON.parse(localStorage.getItem('mindnotes_config')); if (c) Object.assign(APP, c); } catch (e) {}
+  try { const c = JSON.parse(localStorage.getItem(LS_CONFIG)); if (c) Object.assign(APP, c); } catch (e) {}
 }
 
 /* 设置弹窗里的「测试连接」：验证 owner/repo/token 是否正确、Token 是否有 repo 权限 */
@@ -2212,6 +2293,163 @@ async function exportPng(mult, bgMode) {
   }
 }
 
+/* =========================================================================
+ * 账号系统（本地存储 · 不依赖后端）
+ * - 密码 SHA-256 哈希 + 盐，存到 localStorage（不在网络上传输）
+ * - 每个账号独立工作区 localStorage 槽位 + 云端目录（notes/<user>/, assets/<user>/）
+ * - 跨设备同步：每个账号在云端用自己的子目录，互不干扰
+ * ========================================================================= */
+function _loadUsers() { try { return JSON.parse(localStorage.getItem(LS_USERS) || '{}'); } catch (e) { return {}; } }
+function _saveUsers(u) { localStorage.setItem(LS_USERS, JSON.stringify(u)); }
+async function _hash(pwd, salt) {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(salt + ':' + pwd));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function _newSalt() {
+  const a = new Uint8Array(8); crypto.getRandomValues(a);
+  return Array.from(a).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function _isValidUsername(u) { return typeof u === 'string' && /^[a-zA-Z0-9_\-.\u4e00-\u9fa5]{2,32}$/.test(u); }
+async function registerUser(username, password) {
+  username = (username || '').trim();
+  if (!_isValidUsername(username)) throw new Error('用户名需 2-32 字符（字母/数字/_-.·或中文）');
+  if ((password || '').length < 4) throw new Error('密码至少 4 个字符');
+  const users = _loadUsers();
+  if (users[username]) throw new Error('该账号已存在');
+  const salt = _newSalt();
+  const hash = await _hash(password, salt);
+  users[username] = { salt, hash, createdAt: Date.now() };
+  _saveUsers(users);
+  return username;
+}
+async function loginUser(username, password) {
+  username = (username || '').trim();
+  const users = _loadUsers();
+  const rec = users[username];
+  if (!rec) throw new Error('账号不存在');
+  const hash = await _hash(password, rec.salt);
+  if (hash !== rec.hash) throw new Error('密码错误');
+  return username;
+}
+function logoutUser() {
+  currentUser = null;
+  localStorage.removeItem(LS_SESSION);
+}
+function getSession() {
+  try { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); } catch (e) { return null; }
+}
+function setSession(username) {
+  currentUser = username;
+  localStorage.setItem(LS_SESSION, JSON.stringify({ username, loginAt: Date.now() }));
+}
+
+function showAuthModal() {
+  const m = document.getElementById('authModal');
+  if (m) m.classList.remove('hidden');
+  const u = document.getElementById('authUser'); if (u) { u.value = ''; setTimeout(() => u.focus(), 30); }
+  const p = document.getElementById('authPass'); if (p) p.value = '';
+  document.getElementById('authErr').textContent = '';
+  document.getElementById('authPaneLogin').classList.remove('hidden');
+  document.getElementById('authPaneRegister').classList.add('hidden');
+  document.getElementById('authUserList').innerHTML = renderLocalUserList();
+}
+function hideAuthModal() {
+  const m = document.getElementById('authModal');
+  if (m) m.classList.add('hidden');
+}
+function renderLocalUserList() {
+  const users = _loadUsers();
+  const names = Object.keys(users);
+  if (!names.length) return '<div class="muted small" style="padding:6px 4px">还没有任何账号</div>';
+  return names.map(n => `<div class="auth-user-row" data-user="${escapeHtml(n)}">👤 ${escapeHtml(n)}<button data-action="login" title="登录此账号">→</button></div>`).join('');
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+async function doLogin(username, password) {
+  try {
+    const u = await loginUser(username, password);
+    setSession(u);
+    hideAuthModal();
+    /* 登录成功 → 触发主程序 boot */
+    enterApp();
+  } catch (e) { document.getElementById('authErr').textContent = '✗ ' + e.message; }
+}
+async function doRegister(username, password, password2) {
+  if (password !== password2) { document.getElementById('authErr').textContent = '✗ 两次输入的密码不一致'; return; }
+  try {
+    const u = await registerUser(username, password);
+    /* 注册成功后直接登录 */
+    await loginUser(username, password);
+    setSession(u);
+    hideAuthModal();
+    enterApp();
+  } catch (e) { document.getElementById('authErr').textContent = '✗ ' + e.message; }
+}
+function doLogout() {
+  if (!confirm('确定要登出当前账号？\n当前账号的笔记会保留在本机和云端，重新登录后可见。')) return;
+  logoutUser();
+  /* 清空内存中的工作区，强制回登录界面 */
+  notes = {}; noteOrder = []; currentNoteId = null; root = null; selectedId = null;
+  const u = document.getElementById('currentUser'); if (u) u.textContent = '';
+  const lo = document.getElementById('authLogout'); if (lo) lo.classList.add('hidden');
+  try { render(); renderNoteList(); } catch (e) {}
+  showAuthModal();
+}
+
+function wireAuthUI() {
+  document.getElementById('authSwitchReg').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('authPaneLogin').classList.add('hidden');
+    document.getElementById('authPaneRegister').classList.remove('hidden');
+    document.getElementById('authErr').textContent = '';
+    const u = document.getElementById('authUserR'); if (u) { u.value = ''; setTimeout(() => u.focus(), 30); }
+    const p = document.getElementById('authPassR'); if (p) p.value = '';
+    const p2 = document.getElementById('authPassR2'); if (p2) p2.value = '';
+  });
+  document.getElementById('authSwitchLogin').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('authPaneLogin').classList.remove('hidden');
+    document.getElementById('authPaneRegister').classList.add('hidden');
+    document.getElementById('authErr').textContent = '';
+  });
+  document.getElementById('authLoginBtn').addEventListener('click', () => {
+    const u = document.getElementById('authUser').value;
+    const p = document.getElementById('authPass').value;
+    doLogin(u, p);
+  });
+  document.getElementById('authRegBtn').addEventListener('click', () => {
+    const u = document.getElementById('authUserR').value;
+    const p = document.getElementById('authPassR').value;
+    const p2 = document.getElementById('authPassR2').value;
+    doRegister(u, p, p2);
+  });
+  document.getElementById('authLogout').addEventListener('click', doLogout);
+  /* 列表点用户名回填，点 → 直接登录（要求再输密码） */
+  document.getElementById('authUserList').addEventListener('click', (e) => {
+    const row = e.target.closest('.auth-user-row');
+    if (!row) return;
+    const u = row.getAttribute('data-user');
+    document.getElementById('authUser').value = u;
+    document.getElementById('authPass').focus();
+  });
+  /* Enter 提交 */
+  ['authUser', 'authPass'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('authLoginBtn').click(); }
+    });
+  });
+  ['authUserR', 'authPassR', 'authPassR2'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('authRegBtn').click(); }
+    });
+  });
+  /* Esc 关闭（如果已登录才能关） */
+  document.getElementById('authModal').addEventListener('click', (e) => {
+    if (e.target.id === 'authModal' && currentUser) hideAuthModal();
+  });
+}
+
 /* ---------------- 启动 ---------------- */
 function seed() {
   const r = newNode('📚 我的学习笔记');
@@ -2225,14 +2463,34 @@ function seed() {
   return r;
 }
 loadConfig();
-(async function boot() {
+wireAuthUI();
+/* 完全首登：未登录时拦住主界面 */
+const _session = getSession();
+if (_session && _loadUsers()[_session.username]) {
+  currentUser = _session.username;
+  enterApp();
+} else {
+  /* 清理过期 session（指向已删除的账号） */
+  if (_session) localStorage.removeItem(LS_SESSION);
+  showAuthModal();
+}
+
+/* 登录后真正进入主程序 */
+async function enterApp() {
+  /* 兼容迁移：旧版 mindnotes_workspace 升级时把第一个用户迁过去 */
+  migrateOldWorkspace();
+  /* 工具栏显示当前用户 + 登出按钮 */
+  const u = document.getElementById('currentUser');
+  if (u) u.textContent = '👤 ' + currentUser;
+  const lo = document.getElementById('authLogout');
+  if (lo) lo.classList.remove('hidden');
   let ok = false;
   if (configured()) {
     try { await loadWorkspaceFromGithub(); ok = true; } catch (e) { ok = false; }
   }
   if (!ok) {
     if (!loadLocalWorkspace()) {
-      const old = migrateOldLocal();
+      const old = migrateOldLocalForUser();
       if (old) { const id = newId(); notes[id] = old; noteOrder = [id]; currentNoteId = id; }
       else initDefaultWorkspace();
     }
@@ -2241,7 +2499,22 @@ loadConfig();
   render(); fitView(); selectNode(root.id);
   renderNoteList();
   historyReset();
-})();
+}
+
+/* 旧版 mindnotes_workspace（无账号）→ 第一个本地账号的工作区 */
+function migrateOldWorkspace() {
+  if (!currentUser) return;
+  if (localStorage.getItem(workspaceKey(currentUser))) return;   // 目标已有数据
+  const old = localStorage.getItem(LS_WORKSPACE);
+  if (!old) return;
+  localStorage.setItem(workspaceKey(currentUser), old);
+  /* 不删除旧 key，保留给后续登入的账号可能用得上 + 安全起见不丢数据 */
+}
+/* 旧 mindnotes_local 兼容迁移：现在每个账号的命名空间独立，从 login 用户加载 */
+function migrateOldLocalForUser() {
+  /* migrateOldLocal 是从旧的 mindnotes_local 读（无账号概念），现在已无意义，留 stub */
+  return null;
+}
 
 /* 侧边栏交互：新建笔记 / 搜索过滤 */
 const _btnNewNote = document.getElementById('btnNewNote');
