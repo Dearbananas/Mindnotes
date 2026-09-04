@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "root": {
+    "id": "n7ydcnq1",
+    "content": "公司战略",
+    "collapsed": false,
+    "children": [
+      {
+        "id": "nraig8ih",
+        "content": "战略分析",
+        "collapsed": false,
+        "children": [],
+        "w": 120,
+        "h": 43,
+        "x": 184,
+        "y": 0
+      },
+      {
+        "id": "n76tw3hw",
+        "content": "战略选择",
+        "collapsed": false,
+        "children": [],
+        "w": 120,
+        "h": 43,
+        "x": 184,
+        "y": 65
+      },
+      {
+        "id": "n2xb2pl9",
+        "content": "战略实施",
+        "collapsed": false,
+        "children": [],
+        "w": 120,
+        "h": 43,
+        "x": 184,
+        "y": 130
+      }
+    ],
+    "w": 120,
+    "h": 43,
+    "x": 0,
+    "y": 65
+  }
+}
