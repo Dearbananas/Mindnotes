@@ -1,13 +1,18 @@
 {
   "version": 1,
   "order": [
+    "n7gnwbwl",
     "nmxw7g5l"
   ],
-  "current": "nmxw7g5l",
+  "current": "n7gnwbwl",
   "meta": {
+    "n7gnwbwl": {
+      "title": "未命名笔记 2",
+      "updated": 1788508137714
+    },
     "nmxw7g5l": {
       "title": "CPA战略",
-      "updated": 1788507954343
+      "updated": 1788508137714
     }
   }
 }
