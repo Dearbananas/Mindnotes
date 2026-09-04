@@ -9,11 +9,271 @@
         "id": "nraig8ih",
         "content": "战略分析",
         "collapsed": false,
-        "children": [],
+        "children": [
+          {
+            "id": "nvji2a1x",
+            "content": "外部环境分析",
+            "collapsed": false,
+            "children": [
+              {
+                "id": "ny2rg7ry",
+                "content": "宏观环境分析<br>PEST",
+                "collapsed": false,
+                "children": [
+                  {
+                    "id": "nk2xeevn",
+                    "content": "政治与法律因素",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 64,
+                    "x": 736,
+                    "y": 0
+                  },
+                  {
+                    "id": "nquhi8op",
+                    "content": "经济环境因素",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 86
+                  },
+                  {
+                    "id": "n07zegkc",
+                    "content": "社会与文化因素",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 64,
+                    "x": 736,
+                    "y": 151
+                  },
+                  {
+                    "id": "nvamyijb",
+                    "content": "技术环境因素",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 237
+                  }
+                ],
+                "w": 120,
+                "h": 64,
+                "x": 552,
+                "y": 108
+              },
+              {
+                "id": "nm7erao3",
+                "content": "产业环境分析",
+                "collapsed": false,
+                "children": [
+                  {
+                    "id": "nqgg3hvj",
+                    "content": "产品生命周期",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 302
+                  },
+                  {
+                    "id": "nxmcai1i",
+                    "content": "五力模型",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 367
+                  },
+                  {
+                    "id": "n1k8192h",
+                    "content": "成功关键因素",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 432
+                  }
+                ],
+                "w": 120,
+                "h": 43,
+                "x": 552,
+                "y": 367
+              },
+              {
+                "id": "ng87jtx7",
+                "content": "竞争环境分析",
+                "collapsed": false,
+                "children": [
+                  {
+                    "id": "n54pml31",
+                    "content": "竞争对手分析",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 497
+                  },
+                  {
+                    "id": "nodwrx92",
+                    "content": "战略群组分析",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 562
+                  }
+                ],
+                "w": 120,
+                "h": 43,
+                "x": 552,
+                "y": 529.5
+              },
+              {
+                "id": "narcdpus",
+                "content": "市场环境分析",
+                "collapsed": false,
+                "children": [
+                  {
+                    "id": "nf0khoet",
+                    "content": "市场集中度",
+                    "collapsed": false,
+                    "children": [
+                      {
+                        "id": "n7ipy2ar",
+                        "content": "影响因素：供给端、需求端、政策与制度环境、外部冲击与宏观环境",
+                        "collapsed": false,
+                        "children": [],
+                        "w": 120,
+                        "h": 148,
+                        "x": 920,
+                        "y": 627
+                      }
+                    ],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 679.5
+                  },
+                  {
+                    "id": "nwo8m3xe",
+                    "content": "市场结构",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 797
+                  }
+                ],
+                "w": 120,
+                "h": 43,
+                "x": 552,
+                "y": 712
+              }
+            ],
+            "w": 120,
+            "h": 43,
+            "x": 368,
+            "y": 398.5
+          },
+          {
+            "id": "n22759vu",
+            "content": "内部情况分析",
+            "collapsed": false,
+            "children": [
+              {
+                "id": "nzgaameh",
+                "content": "资源与能力分析",
+                "collapsed": false,
+                "children": [],
+                "w": 120,
+                "h": 64,
+                "x": 552,
+                "y": 862
+              },
+              {
+                "id": "nk7tre61",
+                "content": "价值链分析",
+                "collapsed": false,
+                "children": [],
+                "w": 120,
+                "h": 43,
+                "x": 552,
+                "y": 948
+              },
+              {
+                "id": "ntp28lr6",
+                "content": "业务组合分析",
+                "collapsed": false,
+                "children": [
+                  {
+                    "id": "nw42kct6",
+                    "content": "波士顿矩阵",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 1013
+                  },
+                  {
+                    "id": "nfvqa2va",
+                    "content": "通用矩阵",
+                    "collapsed": false,
+                    "children": [],
+                    "w": 120,
+                    "h": 43,
+                    "x": 736,
+                    "y": 1078
+                  }
+                ],
+                "w": 120,
+                "h": 43,
+                "x": 552,
+                "y": 1045.5
+              }
+            ],
+            "w": 120,
+            "h": 43,
+            "x": 368,
+            "y": 970
+          },
+          {
+            "id": "n2oom14h",
+            "content": "内外部结合分析",
+            "collapsed": false,
+            "children": [
+              {
+                "id": "n7b6lrjs",
+                "content": "SWOT分析",
+                "collapsed": false,
+                "children": [],
+                "w": 120,
+                "h": 43,
+                "x": 552,
+                "y": 1143
+              }
+            ],
+            "w": 120,
+            "h": 64,
+            "x": 368,
+            "y": 1143
+          }
+        ],
         "w": 120,
         "h": 43,
         "x": 184,
-        "y": 0
+        "y": 582
       },
       {
         "id": "n76tw3hw",
@@ -23,7 +283,7 @@
         "w": 120,
         "h": 43,
         "x": 184,
-        "y": 65
+        "y": 1229
       },
       {
         "id": "n2xb2pl9",
@@ -33,12 +293,12 @@
         "w": 120,
         "h": 43,
         "x": 184,
-        "y": 130
+        "y": 1294
       }
     ],
     "w": 120,
     "h": 43,
     "x": 0,
-    "y": 65
+    "y": 647
   }
 }
