@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MindNotes · 思维导图笔记</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 顶部工具栏 -->
+  <header id="toolbar">
+    <span class="brand">🧠 MindNotes</span>
+    <div class="group">
+      <button data-act="undo" id="btnUndo" title="撤销 (Ctrl+Z)">↶</button>
+      <button data-act="redo" id="btnRedo" title="重做 (Ctrl+Shift+Z / Ctrl+Y)">↷</button>
+    </div>
+    <div class="group">
+      <button data-act="new" title="新建一篇笔记" class="primary">📄 新建</button>
+    </div>
+    <div class="group">
+      <button data-act="addChild" title="在选中节点下新建子节点 (Tab)">＋ 子节点</button>
+      <button data-act="addSibling" title="在选中节点后新建同级节点">＋ 同级</button>
+      <button data-act="delete" title="删除选中节点及其子树" class="danger">🗑 删除</button>
+      <button data-act="copy" title="复制选中节点的内容 (Ctrl+C)">📋 复制</button>
+    </div>
+    <div class="group">
+      <button data-act="image" title="在选中节点插入图片（也可截图后直接 Ctrl+V 粘贴）">🖼 图片</button>
+      <button data-act="table" title="在选中节点插入表格">▦ 表格</button>
+      <button data-act="style" title="调整节点/文字样式">🎨 样式</button>
+    </div>
+    <div class="group">
+      <button data-act="fit" title="适应屏幕">⤢ 适应</button>
+      <button data-act="zoomIn" title="放大">＋</button>
+      <button data-act="zoomOut" title="缩小">－</button>
+    </div>
+    <div class="group right">
+      <button data-act="search" title="跨笔记内容搜索 (Ctrl+F)">🔍 搜索</button>
+      <button data-act="import" title="导入飞书 / WPS / XMind 思维导图">📥 导入</button>
+      <button data-act="png" title="导出为 PNG 图片">🖼 PNG</button>
+      <button data-act="save" title="保存到 GitHub" class="primary">💾 保存</button>
+      <button data-act="load" title="从 GitHub 加载">↻ 加载</button>
+      <button data-act="export" title="导出 JSON 文件">⤓ JSON</button>
+      <button data-act="exportMd" title="导出 Markdown 文件（可粘到 Obsidian / Notion / 博客）">⤓ MD</button>
+      <button data-act="settings" title="GitHub 设置">⚙ 设置</button>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" hidden />
+  </header>
+
+  <!-- 工作区：侧边栏 + 画布 -->
+  <div id="workspace">
+    <!-- 左侧笔记侧边栏 -->
+    <aside id="sidebar">
+      <div class="sb-head">
+        <span class="sb-title">📒 笔记</span>
+        <button id="btnNewNote" title="新建笔记">＋</button>
+      </div>
+      <div class="sb-search">
+        <input id="noteSearch" type="text" placeholder="搜索笔记…" />
+      </div>
+      <ul id="noteList" class="sb-list"></ul>
+    </aside>
+
+    <!-- 画布区 -->
+    <main id="viewport">
+      <div id="canvas">
+        <svg id="edges" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="nodes"></div>
+        <div id="imgHandle" class="hidden" title="拖动调整图片大小"></div>
+      </div>
+      <div id="hint">双击节点编辑 · <b>Enter</b> 加同级 / <b>Tab</b> 加子级 / <b>Tab+Shift</b> 升级 / <b>Ctrl+Enter</b> 加子级并聚焦 / <b>Delete</b> 删除 · 按住节点拖动可换层级 · 点图片放大 / 拖右下角调大小 · 🎨样式 · <b>Ctrl+Z</b> 撤销 · 滚轮缩放</div>
+    </main>
+  </div>
+
+  <!-- 样式面板（浮动在右侧） -->
+  <aside id="stylePanel" class="hidden">
+    <div class="sp-head">
+      <span>🎨 样式</span>
+      <button id="spClose" title="关闭">✕</button>
+    </div>
+
+    <div class="sp-body">
+      <div class="sp-row">
+        <label>字号</label>
+        <input type="range" id="spSize" min="12" max="36" step="1" value="14" />
+        <span class="sp-val" id="spSizeVal">14px</span>
+      </div>
+
+      <div class="sp-row">
+        <label>文字</label>
+        <div class="sp-btns">
+          <button data-sp="bold" title="加粗"><b>B</b></button>
+          <button data-sp="italic" title="斜体"><i>I</i></button>
+          <button data-sp="underline" title="下划线"><u>U</u></button>
+          <button data-sp="strike" title="删除线"><s>S</s></button>
+        </div>
+      </div>
+
+      <div class="sp-row">
+        <label>文字色</label>
+        <input type="color" id="spColor" value="#e6e9ef" />
+        <div class="sp-sw" data-target="color">
+          <i style="background:#e6e9ef"></i><i style="background:#ff6b6b"></i>
+          <i style="background:#ffa94d"></i><i style="background:#ffd43b"></i>
+          <i style="background:#6ee7b7"></i><i style="background:#4f8cff"></i>
+          <i style="background:#b197fc"></i><i style="background:#8b93a3"></i>
+        </div>
+      </div>
+
+      <div class="sp-row">
+        <label>节点背景</label>
+        <input type="color" id="spBg" value="#1d2230" />
+        <div class="sp-sw" data-target="bg">
+          <i style="background:#1d2230"></i><i style="background:#2d1f2b"></i>
+          <i style="background:#33291a"></i><i style="background:#1b2a24"></i>
+          <i style="background:#1a2436"></i><i style="background:#231f38"></i>
+          <i style="background:#3a2a12"></i><i style="background:#2a2d33"></i>
+        </div>
+      </div>
+
+      <div class="sp-row">
+        <label>边框色</label>
+        <input type="color" id="spBorder" value="#39414f" />
+      </div>
+
+      <div class="sp-row">
+        <label>强调</label>
+        <div class="sp-btns">
+          <button data-sp="highlight" title="标亮整个节点">✨ 标亮</button>
+          <button data-sp="reset" title="清除该节点所有样式">↺ 重置</button>
+        </div>
+      </div>
+
+      <p class="sp-tip">
+        选中节点内一段文字 → 只改<b>这段文字</b>；<br />
+        不选中文字 → 改<b>整个节点</b>。
+      </p>
+    </div>
+  </aside>
+
+  <!-- 图片放大查看器 -->
+  <div id="lightbox" class="hidden">
+    <div class="lb-bar">
+      <button data-lb="out" title="缩小">－</button>
+      <span id="lbScale">100%</span>
+      <button data-lb="in" title="放大">＋</button>
+      <button data-lb="fit" title="适应窗口">适应</button>
+      <button data-lb="orig" title="原始大小">1:1</button>
+      <span class="lb-spacer"></span>
+      <button data-lb="del" class="danger" title="从节点中删除这张图">🗑 删除</button>
+      <button data-lb="close" title="关闭 (Esc)">关闭 ✕</button>
+    </div>
+    <div class="lb-stage" id="lbStage">
+      <img id="lbImg" alt="" draggable="false" />
+    </div>
+    <div class="lb-tip">滚轮缩放 · 拖动移动 · 点击空白处或按 Esc 关闭</div>
+  </div>
+
+  <!-- 设置弹窗 -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-box">
+      <h3>云端存储设置</h3>
+      <p class="muted">数据通过仓库的 Contents API 读写，免费且跨设备。未配置时自动用浏览器本地存储兜底。</p>
+      <label>存储平台<select id="setProvider">
+        <option value="github">GitHub（国际，需科学上网/稳定网络）</option>
+        <option value="gitee">Gitee（国内直连，推荐国内用户）</option>
+      </select></label>
+      <label>用户名 (owner)<input id="setOwner" placeholder="如 dearbananas" /></label>
+      <label>仓库名 (repo)<input id="setRepo" placeholder="如 mindnotes" /></label>
+      <label>分支 (branch)<input id="setBranch" placeholder="GitHub 默认 main / Gitee 默认 master" /></label>
+      <label>Token (PAT)<input id="setToken" type="password" placeholder="github: ghp_... / gitee: 私人令牌" /></label>
+      <label>笔记目录<input id="setNotesFolder" placeholder="notes" /></label>
+      <label>图片目录<input id="setAssets" placeholder="assets" /></label>
+      <div class="modal-actions">
+        <button id="setSave" class="primary">保存设置</button>
+        <button id="btnTestConn">测试连接</button>
+        <button id="setClose">关闭</button>
+      </div>
+      <p class="muted small">Token 仅保存在本机浏览器，不会上传到任何第三方。Gitee 的 token 通过 URL 传递，请确保仓库为私有或可接受该方式。</p>
+    </div>
+  </div>
+
+  <!-- 导入弹窗 -->
+  <div id="importModal" class="modal hidden">
+    <div class="modal-box wide">
+      <h3>📥 导入思维导图</h3>
+      <p class="muted">
+        支持：<b>.mm</b>（飞书 / WPS 都能导出，首选）· <b>.opml</b> · <b>.xmind</b> ·
+        <b>.txt / .md</b> 大纲 · <b>.json</b>（本工具备份）
+      </p>
+
+      <div class="imp-tabs">
+        <button class="imp-tab on" data-imp-tab="file">📄 选择文件</button>
+        <button class="imp-tab" data-imp-tab="paste">📋 粘贴大纲文本</button>
+      </div>
+
+      <div id="impPaneFile" class="imp-pane">
+        <div id="dropZone">
+          <div class="dz-title">点击选择文件，或把文件拖到这里</div>
+          <div class="dz-sub" id="dzFile">尚未选择文件</div>
+        </div>
+        <input type="file" id="importFile"
+               accept=".mm,.opml,.xml,.xmind,.pos,.km,.txt,.md,.markdown,.json" hidden />
+      </div>
+
+      <div id="impPanePaste" class="imp-pane hidden">
+        <textarea id="impText" spellcheck="false" placeholder="把飞书 / WPS 大纲视图里的文字全选复制，粘贴到这里。
+
+支持这些写法：
+# 一级主题
+## 二级主题
+### 三级主题
+
+或缩进（Tab / 空格）、- 列表、1. 编号，例如：
+数学
+	代数
+	几何
+英语"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button id="impReplace" class="primary">替换当前导图</button>
+        <button id="impInsert">插入到选中节点下</button>
+        <button id="impClose">关闭</button>
+      </div>
+
+      <p class="muted small">
+        <b>怎么从飞书导出：</b>思维笔记 → 右上角「···」→ 下载 → <b>FreeMind(.mm)</b><br />
+        <b>怎么从 WPS 导出：</b>思维导图 → 导出 → <b>.mm</b> / .opml / .txt（pos 是 WPS 私有格式，可能解析失败）
+      </p>
+    </div>
+  </div>
+
+  <!-- 导出 PNG 弹窗 -->
+  <div id="pngModal" class="modal hidden">
+    <div class="modal-box">
+      <h3>🖼 导出 PNG</h3>
+      <p class="muted">只导出当前<b>展开可见</b>的节点。折叠起来的分支不会出现在图里。</p>
+      <label>清晰度
+        <div class="seg" id="pngScale">
+          <button data-v="1">1x</button>
+          <button data-v="2" class="on">2x</button>
+          <button data-v="3">3x</button>
+        </div>
+      </label>
+      <label>背景
+        <div class="seg" id="pngBg">
+          <button data-v="dark" class="on">深色</button>
+          <button data-v="white">白色</button>
+          <button data-v="none">透明</button>
+        </div>
+      </label>
+      <div class="modal-actions">
+        <button id="pngGo" class="primary">导出</button>
+        <button id="pngClose">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 搜索弹窗（跨笔记内容） -->
+  <div id="searchModal" class="modal hidden">
+    <div class="modal-box" style="max-width: 560px; width: 92vw;">
+      <h3>🔍 跨笔记搜索</h3>
+      <input id="searchInput" type="search" placeholder="输入关键词，回车跳转 ↑↓ 切换结果 Esc 关闭" autocomplete="off"
+             style="width:100%; padding:8px 10px; font-size:14px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius:6px; outline:none;">
+      <div id="searchResults" style="margin-top:10px; max-height: 60vh; overflow-y: auto;"></div>
+      <p class="muted small" style="margin-top:8px">默认在所有笔记的节点内容中匹配；命中后点列表或按回车跳转（自动切笔记 + 选中节点 + 居中）。</p>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+
+  <!-- 节点右键菜单 -->
+  <div id="nodeMenu" class="ctxmenu hidden">
+    <button data-menu="copy">📋 复制节点内容</button>
+    <button data-menu="copyText">📄 复制为纯文本</button>
+    <button data-menu="copyTree">🌳 复制子树大纲</button>
+    <button data-menu="copyBranch">🌿 复制分支</button>
+    <button data-menu="pasteBranch">📥 粘贴分支</button>
+    <div class="ctx-sep"></div>
+    <button data-menu="addChild">＋ 新建子节点</button>
+    <button data-menu="addSibling">＋ 新建同级节点</button>
+    <button data-menu="style">🎨 样式</button>
+    <div class="ctx-sep"></div>
+    <button data-menu="delete" class="danger">🗑 删除节点</button>
+  </div>
+
+  <script src="app.js?v=20260904g"></script>
+</body>
+</html>
