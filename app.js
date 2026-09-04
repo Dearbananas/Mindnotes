@@ -101,6 +101,16 @@ function render() {
       el.appendChild(g);
     }
 
+    // 节点尺寸调整手柄（右下角 · 改宽度/高度）—— 任意节点都能调
+    {
+      const rh = document.createElement('div');
+      rh.className = 'resize-handle';
+      rh.contentEditable = 'false';
+      rh.title = '拖动调整节点尺寸（Ctrl = 只改高 / Shift = 只改宽）';
+      rh.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); startNodeResize(n.id, e); });
+      el.appendChild(rh);
+    }
+
     /* mousedown 只标记选中、阻止画布平移；光标交给浏览器原生处理（点在哪光标就在哪）。
        若传 focus=true 会强制把光标移到末尾，导致无法在文字中间编辑/拖选。
        额外显式 focus 一道：兼容个别浏览器在可编辑元素上不自动聚焦的边缘情况。 */
@@ -258,8 +268,14 @@ function applyNodeStyle(el, n) {
   el.style.color      = s.color  || '';
   el.style.background = s.bg     || '';
   el.style.borderColor= s.border || '';
+  /* 尺寸：minW 是用户拖宽的"最小宽度"（=节点的"自定义宽度"），maxW 兜底防止内容撑到太宽。
+     minH 是"自定义高度"（拖高时设），节点默认高度由内容决定。 */
+  el.style.minWidth  = s.minW ? s.minW + 'px' : '';
   el.style.maxWidth  = s.maxW ? s.maxW + 'px' : '';
+  el.style.minHeight = s.minH ? s.minH + 'px' : '';
+  el.style.height    = s.minH ? s.minH + 'px' : '';   // 设了 minH 就锁高（用户主动锁的，不让内容撑开）
   el.classList.toggle('highlight', !!s.highlight);
+  el.classList.toggle('sized',    !!(s.minW || s.minH || s.maxW));
 }
 
 /* 左→右树形布局：先量节点尺寸，再递归定位 */
@@ -1502,7 +1518,9 @@ function deleteImageFromNode() {
  * ========================================================================= */
 const imgHandle = document.getElementById('imgHandle');
 let handleImg = null;          // 当前手柄对应的 <img>
-let resizing = false;
+let resizing = false;          // 图片 resize
+let resizingNode = null;       // 节点 resize: { id, startX, startY, startW, startH, mode: 'xy'|'x'|'y' }
+let resizingNodeStart = null;
 let resizeStart = null;        // { x, w }
 
 function showImgHandle(img) {
@@ -1569,6 +1587,78 @@ window.addEventListener('mouseup', () => {
   layout(); drawEdges();
   positionImgHandle();
 });
+
+/* =========================================================================
+ * 节点尺寸调整：右下角手柄拖动改宽度/高度
+ * - 默认同时改宽 + 改高
+ * - Ctrl 只改高（手柄上下拖）
+ * - Shift 只改宽（手柄左右拖）
+ * - 改完存到 n.style.minW / minH，跟着 workspace 一起持久化
+ * - applyNodeStyle 在 render 时把这些样式重新套回去
+ * ========================================================================= */
+function startNodeResize(id, e) {
+  const n = findNode(root, id);
+  if (!n || !n._el) return;
+  resizingNode = id;
+  const r = n._el.getBoundingClientRect();
+  resizingNodeStart = {
+    x: e.clientX, y: e.clientY,
+    startW: r.width, startH: r.height,
+    curW: (n.style && n.style.minW) || 0,
+    curH: (n.style && n.style.minH) || 0,
+  };
+  /* 立刻给个最小值（120x40），避免无样式节点 width=0 的极小情况 */
+  if (!resizingNodeStart.curW) resizingNodeStart.curW = Math.max(120, r.width);
+  if (!resizingNodeStart.curH) resizingNodeStart.curH = Math.max(40, r.height);
+  document.body.style.cursor = e.shiftKey ? 'ew-resize' : e.ctrlKey ? 'ns-resize' : 'nwse-resize';
+  /* 阻止 mousedown 冒泡触发 selectNode 的"非编辑态 focus"逻辑 */
+  e.preventDefault();
+}
+window.addEventListener('mousemove', (e) => {
+  if (!resizingNode) return;
+  const n = findNode(root, resizingNode);
+  if (!n || !n._el) return;
+  const dx = (e.clientX - resizingNodeStart.x) / scale;
+  const dy = (e.clientY - resizingNodeStart.y) / scale;
+  /* 限制：最小宽 80 / 最小高 28（保留一行文字+padding），最大宽 2000 / 最大高 1500 */
+  const minW = 80, maxW = 2000, minH = 28, maxH = 1500;
+  /* Shift = 只改宽（跳过高度）；Ctrl = 只改高（跳过宽度）；都不按 = 都改 */
+  const skipH = e.shiftKey;   // Shift 锁定宽
+  const skipW = e.ctrlKey;    // Ctrl 锁定高
+  n.style = n.style || {};
+  if (!skipW) {
+    const newW = Math.max(minW, Math.min(maxW, Math.round(resizingNodeStart.startW + dx)));
+    n.style.minW = newW;
+  }
+  if (!skipH) {
+    const newH = Math.max(minH, Math.min(maxH, Math.round(resizingNodeStart.startH + dy)));
+    n.style.minH = newH;
+  }
+  applyNodeStyle(n._el, n);
+  /* 拖动过程中也要重排 + 重画线，否则兄弟节点位置不变会重叠 */
+  layout(); drawEdges();
+  document.body.style.cursor = skipH ? 'ew-resize' : skipW ? 'ns-resize' : 'nwse-resize';
+});
+window.addEventListener('mouseup', () => {
+  if (!resizingNode) return;
+  const n = findNode(root, resizingNode);
+  resizingNode = null;
+  resizingNodeStart = null;
+  document.body.style.cursor = '';
+  if (n) {
+    /* 落账：commit 历史 + autosave */
+    autosave();
+  }
+});
+/* 公开：恢复节点默认尺寸（清掉自定义 minW/minH/maxW） */
+function resetNodeSize(id) {
+  const n = id ? findNode(root, id) : (selectedId ? findNode(root, selectedId) : null);
+  if (!n) return;
+  if (n.style) { delete n.style.minW; delete n.style.minH; delete n.style.maxW; }
+  if (n._el) applyNodeStyle(n._el, n);
+  layout(); drawEdges();
+  autosave();
+}
 
 /* =========================================================================
  * 节点拖拽换父级
@@ -1753,6 +1843,7 @@ function applyStyle(action, value) {
   else if (action === 'italic') n.style.italic = !n.style.italic;
   else if (action === 'highlight') n.style.highlight = !n.style.highlight;
   else if (action === 'reset') { n.style = {}; }
+  else if (action === 'resetSize') { if (n.style) { delete n.style.minW; delete n.style.minH; delete n.style.maxW; } }
   applyNodeStyle(n._el, n);
   syncStylePanel();
   autosave();
